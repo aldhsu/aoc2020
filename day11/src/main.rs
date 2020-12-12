@@ -17,16 +17,54 @@ impl std::fmt::Debug for Map {
             .collect::<Vec<String>>()
             .join("\n");
 
-        write!(f, "width: {}, height: {}\n{}", self.width, self.height, string)
+        write!(
+            f,
+            "width: {}, height: {}\n{}",
+            self.width, self.height, string
+        )
     }
 }
 
 impl Map {
     const POSITIONS: [(isize, isize); 8] = [
-        (-1, -1), (0, -1), (1, -1),
-        (-1, 0),            (1, 0),
-        (-1, 1), (0, 1), (1, 1),
+        (-1, -1),
+        (0, -1),
+        (1, -1),
+        (-1, 0),
+        (1, 0),
+        (-1, 1),
+        (0, 1),
+        (1, 1),
     ];
+
+    fn next2(&mut self) -> bool {
+        let mut changes = vec![];
+        for i in 0..self.inner.len() {
+            let pos = self.from_index(i);
+            match &self.inner[i] {
+                Tile::EmptySeat => {
+                    if self.los_count(pos.0, pos.1) == 0 {
+                        changes.push(i);
+                    }
+                }
+                Tile::OccupiedSeat => {
+                    if pos.0 == self.width as isize - 1 {}
+                    if self.los_count(pos.0, pos.1) >= 5 {
+                        changes.push(i);
+                    }
+                }
+                _ => continue,
+            }
+        }
+
+        changes.iter().for_each(|&i| match self.inner.get_mut(i) {
+            Some(tile @ Tile::EmptySeat) => *tile = Tile::OccupiedSeat,
+            Some(tile @ Tile::OccupiedSeat) => *tile = Tile::EmptySeat,
+            _ => unreachable!(),
+        });
+
+        !changes.is_empty()
+    }
 
     fn next(&mut self) -> bool {
         let mut changes = vec![];
@@ -39,8 +77,7 @@ impl Map {
                     }
                 }
                 Tile::OccupiedSeat => {
-                    if pos.0 == self.width as isize - 1 {
-                    }
+                    if pos.0 == self.width as isize - 1 {}
                     if self.adjacent_count(pos.0, pos.1) >= 4 {
                         changes.push(i);
                     }
@@ -67,6 +104,27 @@ impl Map {
                     1
                 } else {
                     0
+                }
+            })
+            .sum()
+    }
+
+    fn los_count(&self, x: isize, y: isize) -> u32 {
+        Self::POSITIONS
+            .iter()
+            .map(|(o_x, o_y)| {
+                let mut offset_x = *o_x;
+                let mut offset_y = *o_y;
+                loop {
+                    match self.read(x + offset_x, y + offset_y) {
+                        Some(Tile::EmptySeat) => return 0,
+                        Some(Tile::OccupiedSeat) => return 1,
+                        Some(Tile::Floor) => {
+                            offset_x += o_x;
+                            offset_y += o_y;
+                        }
+                        None => return 0,
+                    }
                 }
             })
             .sum()
@@ -179,6 +237,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let part1 = map.count_occupied_seats();
     println!("part1: {}", part1);
+
+    let mut map: Map = input.parse()?;
+    while map.next2() {
+        println!("{}", map.count_occupied_seats());
+    }
+
+    let part2 = map.count_occupied_seats();
+    println!("part2: {}", part2);
     Ok(())
 }
 
@@ -246,6 +312,67 @@ L.L.L..L..
             #.#####.##"#
             .parse()
             .unwrap();
-        assert_eq!(round1.adjacent_count(9,0), 3);
+        assert_eq!(round1.adjacent_count(9, 0), 3);
+    }
+
+    #[test]
+    fn it_works_part2() {
+        let input = r#"L.LL.LL.LL
+            LLLLLLL.LL
+            L.L.L..L..
+            LLLL.LL.LL
+            L.LL.LL.LL
+            L.LLLLL.LL
+            ..L.L.....
+            LLLLLLLLLL
+            L.LLLLLL.L
+            L.LLLLL.LL"#;
+        let mut map: Map = input.parse().unwrap();
+        map.next2();
+        let round1: Map = r#"#.##.##.##
+            #######.##
+            #.#.#..#..
+            ####.##.##
+            #.##.##.##
+            #.#####.##
+            ..#.#.....
+            ##########
+            #.######.#
+            #.#####.##"#
+            .parse()
+            .unwrap();
+        assert_eq!(map, round1);
+
+        map.next2();
+        let round2: Map = r#"#.LL.LL.L#
+            #LLLLLL.LL
+            L.L.L..L..
+            LLLL.LL.LL
+            L.LL.LL.LL
+            L.LLLLL.LL
+            ..L.L.....
+            LLLLLLLLL#
+            #.LLLLLL.L
+            #.LLLLL.L#"#
+            .parse()
+            .unwrap();
+        assert_eq!(map, round2);
+    }
+
+    #[test]
+    fn it_does_los_counts() {
+        let map: Map = r#"#.##.##.##
+            #######.##
+            #.#.#..#..
+            ####.##.##
+            #.##.##.##
+            #.#####.##
+            ..#.#.....
+            ##########
+            #.######.#
+            #.#####.##"#
+            .parse()
+            .unwrap();
+        assert_eq!(map.los_count(6, 0), 5);
     }
 }
